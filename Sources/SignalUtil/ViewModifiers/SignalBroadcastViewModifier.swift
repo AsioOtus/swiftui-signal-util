@@ -1,25 +1,25 @@
 import Combine
 import SwiftUI
 
-struct SignalBroadcastViewModifier <SignalPayload, PayloadPublisher>: ViewModifier
+struct SignalBroadcastViewModifier <Payload, PayloadPublisher>: ViewModifier
 where
-SignalPayload: Sendable,
-SignalPayload: Equatable,
-PayloadPublisher: Publisher<SignalPayload, Never>
+Payload: Sendable,
+Payload: Equatable,
+PayloadPublisher: Publisher<Payload, Never>
 {
     private let logger: Logger
     @Environment(\.signalLogLevel) private var minLogLevel: LogLevel
 
-    private let eventCompletionHandler: (Signal<SignalPayload>, Error?) -> Void
+    private let eventCompletionHandler: (Signal<Payload>, Error?) -> Void
     private let payloadPublisher: PayloadPublisher
     
-    @StateObject private var signal: Reference<Signal<SignalPayload>?> = .init(nil)
+    @StateObject private var signal: Reference<Signal<Payload>?> = .init(nil)
 
     init (
         payloadPublisher: PayloadPublisher,
         fileId: String,
         line: Int,
-        eventCompletionHandler: @escaping (Signal<SignalPayload>, Error?) -> Void
+        eventCompletionHandler: @escaping (Signal<Payload>, Error?) -> Void
     ) {
         self.eventCompletionHandler = eventCompletionHandler
         self.payloadPublisher = payloadPublisher
@@ -33,14 +33,14 @@ PayloadPublisher: Publisher<SignalPayload, Never>
             .environmentObject(signal)
     }
 
-    private func onNewSignal (payload: SignalPayload) {
+    private func onNewSignal (payload: Payload) {
         let newId = String(UUID().uuidString.prefix(8))
         let signal = Signal(id: newId, status: .dispatching, payload: payload)
 
         handleNewSignal(signal)
     }
 
-    private func handleNewSignal (_ signal: Signal<SignalPayload>) {
+    private func handleNewSignal (_ signal: Signal<Payload>) {
         logger.log(
             .trace,
             nil,
@@ -64,7 +64,7 @@ PayloadPublisher: Publisher<SignalPayload, Never>
         self.signal.referencedValue = signal
     }
 
-    private func onSignalChanged (_ signal: Signal<SignalPayload>?) {
+    private func onSignalChanged (_ signal: Signal<Payload>?) {
         if let signal, signal.status.isCompleted {
             logger.log(
                 .trace,
@@ -80,18 +80,18 @@ PayloadPublisher: Publisher<SignalPayload, Never>
 }
 
 public extension View {
-    func signalBroadcast <SignalPayload, SignalPayloadPublisher> (
-        _ payloadPublisher: SignalPayloadPublisher,
+    func signalBroadcast <Payload, PayloadPublisher> (
+        _ payloadPublisher: PayloadPublisher,
         fileId: String = #fileID,
         line: Int = #line,
-        onEventCompletion: @escaping (Signal<SignalPayload>, Error?) -> Void = { _, _ in }
+        onEventCompletion: @escaping (Signal<Payload>, Error?) -> Void = { _, _ in }
     ) -> some View
     where
-    SignalPayload: Sendable,
-    SignalPayloadPublisher: Publisher<SignalPayload, Never>
+    Payload: Sendable,
+    PayloadPublisher: Publisher<Payload, Never>
     {
         modifier(
-            SignalBroadcastViewModifier<SignalPayload, SignalPayloadPublisher>(
+            SignalBroadcastViewModifier<Payload, PayloadPublisher>(
                 payloadPublisher: payloadPublisher,
                 fileId: fileId,
                 line: line,

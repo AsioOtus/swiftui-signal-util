@@ -1,18 +1,21 @@
 import SwiftUI
 
-struct OnSignalViewModifier <SignalPayload>: ViewModifier where SignalPayload: Sendable, SignalPayload: Equatable {
+struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Payload: Equatable {
     private let logger: Logger
     @Environment(\.signalLogLevel) private var minLogLevel: LogLevel
 
-    @EnvironmentObject private var signalReference: Reference<Signal<SignalPayload>?>
-    @State private var lastReceivedSignal: Signal<SignalPayload>?
-    private let handler: SignalHandler<SignalPayload>
+    @EnvironmentObject private var signalReference: Reference<Signal<Payload>?>
+    @State private var lastReceivedSignal: Signal<Payload>?
+    private let handler: SignalHandler<Payload>
+    private let allowedPayloads: [Payload]?
 
     init (
+        allowedPayloads: [Payload]?,
         fileId: String,
         line: Int,
-        handler: @escaping SignalHandler<SignalPayload>
+        handler: @escaping SignalHandler<Payload>
     ) {
+        self.allowedPayloads = allowedPayloads
         self.handler = handler
         self.logger = .init(name: "onSignal", fileId: fileId, line: line)
     }
@@ -31,13 +34,13 @@ struct OnSignalViewModifier <SignalPayload>: ViewModifier where SignalPayload: S
         handle(signalReference.referencedValue, source)
     }
 
-    private func handle (_ signal: Signal<SignalPayload>?, _ source: String) {
+    private func handle (_ signal: Signal<Payload>?, _ source: String) {
         guard let signal = signal else {
             logger.log(
                 .notice,
                 source,
                 "nil signal",
-                Signal<SignalPayload>?.none,
+                Signal<Payload>?.none,
                 minLevel: minLogLevel
             )
             return
@@ -48,6 +51,17 @@ struct OnSignalViewModifier <SignalPayload>: ViewModifier where SignalPayload: S
                 .notice,
                 source,
                 "Duplicated signal",
+                signal,
+                minLevel: minLogLevel
+            )
+            return
+        }
+
+        if let allowedPayloads, !allowedPayloads.contains(signal.payload) {
+            logger.log(
+                .notice,
+                source,
+                "Prohibited payload",
                 signal,
                 minLevel: minLogLevel
             )
@@ -98,18 +112,18 @@ struct OnSignalViewModifier <SignalPayload>: ViewModifier where SignalPayload: S
         )
 
         Task {
-            try? await Task.sleep(nanoseconds: 100_000_000)
+            try? await Task.sleep(nanoseconds: 250_000_000)
 
-            let (processingAction, signalPayload) = await handle(signal)
+            let (processingAction, Payload) = await handle(signal)
 
-            if lastReceivedSignal?.id == signal.id, lastReceivedSignal?.payload != signalPayload {
+            if lastReceivedSignal?.id == signal.id, lastReceivedSignal?.payload != Payload {
                 lastReceivedSignal = nil
             }
 
-            let handledSignal = Signal<SignalPayload>(
+            let handledSignal = Signal<Payload>(
                 id: signal.id,
                 status: processingAction.signalStatus,
-                payload: signalPayload
+                payload: Payload
             )
 
             logger.log(
@@ -132,7 +146,7 @@ struct OnSignalViewModifier <SignalPayload>: ViewModifier where SignalPayload: S
         }
     }
 
-    private func handle (_ signal: Signal<SignalPayload>) async -> (ProcessingAction, SignalPayload) {
+    private func handle (_ signal: Signal<Payload>) async -> (ProcessingAction, Payload) {
         do {
             return try await handler(signal)
         } catch {

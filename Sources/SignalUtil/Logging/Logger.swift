@@ -17,11 +17,11 @@ struct Logger {
         self.logger = .init()
     }
 
-    func log <SignalPayload> (
+    func log <Payload> (
         _ level: LogLevel,
         _ source: String?,
         _ text: String,
-        _ signal: Signal<SignalPayload>?,
+        _ signal: Signal<Payload>?,
         minLevel: LogLevel
     ) {
         guard level.rawValue >= minLevel.rawValue else { return }
@@ -41,11 +41,11 @@ struct Logger {
         }
     }
 
-    private func prepareMessage <SignalPayload> (
+    private func prepareMessage <Payload> (
         _ level: LogLevel,
         _ source: String?,
         _ text: String,
-        _ signal: Signal<SignalPayload>?,
+        _ signal: Signal<Payload>?,
     ) -> String {
         let level = String(describing: level)
         let location = "\(name) (\(fileId):\(line))"

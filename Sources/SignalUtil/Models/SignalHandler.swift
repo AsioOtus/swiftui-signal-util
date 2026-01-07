@@ -1,1 +1,1 @@
-public typealias SignalHandler <SignalPayload> = (Signal<SignalPayload>) async throws -> (ProcessingAction, SignalPayload) where SignalPayload: Equatable
+public typealias SignalHandler <Payload> = (Signal<Payload>) async throws -> (ProcessingAction, Payload) where Payload: Equatable
