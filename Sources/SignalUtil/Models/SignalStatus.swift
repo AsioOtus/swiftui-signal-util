@@ -1,6 +1,6 @@
 public enum SignalStatus: Sendable {
     case dispatching
-    case processing
+    case processing(String)
     case completed(Error?)
 
     var isDispatching: Bool {

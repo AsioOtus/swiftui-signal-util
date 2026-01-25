@@ -9,6 +9,8 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
     private let handler: SignalHandler<Payload>
     private let allowedPayloads: [Payload]?
 
+    private let location: String
+
     init (
         allowedPayloads: [Payload]?,
         fileId: String,
@@ -18,24 +20,21 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
         self.allowedPayloads = allowedPayloads
         self.handler = handler
         self.logger = .init(name: "onSignal", fileId: fileId, line: line)
+        self.location = "\(fileId):\(line)"
     }
 
     func body (content: Content) -> some View {
         content
-            .onChange(of: signalReference.referencedValue) {
-                handle($0, "onChange")
+            .onChange(of: signalReference.referencedValue) { _ in
+                process("onChange")
             }
             .onAppear {
-                handle("onAppear")
+                process("onAppear")
             }
     }
 
-    private func handle (_ source: String) {
-        handle(signalReference.referencedValue, source)
-    }
-
-    private func handle (_ signal: Signal<Payload>?, _ source: String) {
-        guard let signal = signal else {
+    private func process (_ source: String) {
+        guard let signal = signalReference.referencedValue else {
             logger.log(
                 .notice,
                 source,
@@ -50,7 +49,7 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
             logger.log(
                 .notice,
                 source,
-                "Duplicated signal",
+                "Duplicate",
                 signal,
                 minLevel: minLogLevel
             )
@@ -72,7 +71,7 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
             logger.log(
                 .debug,
                 source,
-                "Processing signal",
+                "Already processing",
                 signal,
                 minLevel: minLogLevel
             )
@@ -83,7 +82,7 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
             logger.log(
                 .debug,
                 source,
-                "Completed signal",
+                "Already completed",
                 signal,
                 minLevel: minLogLevel
             )
@@ -95,19 +94,19 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
         logger.log(
             .debug,
             source,
-            "Signal handling started - environment state",
-            signalReference.referencedValue,
+            "Processing started – pre",
+            signal,
             minLevel: minLogLevel
         )
 
-        let processingSignal = signal.setStatus(.processing)
+        let processingSignal = signal.setStatus(.processing(location))
         signalReference.referencedValue = processingSignal
 
         logger.log(
             .info,
             source,
-            "Signal handling started",
-            processingSignal,
+            "Processing started – post",
+            signalReference.referencedValue,
             minLevel: minLogLevel
         )
 
@@ -129,7 +128,7 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
             logger.log(
                 .debug,
                 source,
-                "Handled signal - environment state",
+                "Processing completed – pre",
                 signalReference.referencedValue,
                 minLevel: minLogLevel
             )
@@ -139,8 +138,8 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
             logger.log(
                 .info,
                 source,
-                "Handled signal",
-                handledSignal,
+                "Processing completed – post",
+                signalReference.referencedValue,
                 minLevel: minLogLevel
             )
         }
