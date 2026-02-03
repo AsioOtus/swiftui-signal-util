@@ -1,10 +1,11 @@
+import Combine
 import SwiftUI
 
 struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Payload: Equatable {
-    private let logger: Logger
+    private let logger: Logger<Payload>
     @Environment(\.signalLogLevel) private var minLogLevel: LogLevel
 
-    @EnvironmentObject private var signalReference: Reference<Signal<Payload>?>
+    @EnvironmentObject private var signalPublisher: Reference<CurrentValueSubject<Signal<Payload>?, Never>>
     @State private var lastReceivedSignal: Signal<Payload>?
     private let handler: SignalHandler<Payload>
     private let allowedPayloads: [Payload]?
@@ -19,14 +20,18 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
     ) {
         self.allowedPayloads = allowedPayloads
         self.handler = handler
-        self.logger = .init(name: "onSignal", fileId: fileId, line: line)
+        self.logger = .init(
+            name: "onSignal",
+            fileId: fileId,
+            line: line
+        )
         self.location = "\(fileId):\(line)"
     }
 
     func body (content: Content) -> some View {
         content
-            .onChange(of: signalReference.referencedValue) { _ in
-                process("onChange")
+            .onReceive(signalPublisher.referencedValue) { _ in
+                process("onReceive")
             }
             .onAppear {
                 process("onAppear")
@@ -34,7 +39,7 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
     }
 
     private func process (_ source: String) {
-        guard let signal = signalReference.referencedValue else {
+        guard let signal = signalPublisher.referencedValue.value else {
             logger.log(
                 .notice,
                 source,
@@ -100,13 +105,13 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
         )
 
         let processingSignal = signal.setStatus(.processing(location))
-        signalReference.referencedValue = processingSignal
+        signalPublisher.referencedValue.send(processingSignal)
 
         logger.log(
             .info,
             source,
             "Processing started – post",
-            signalReference.referencedValue,
+            signalPublisher.referencedValue.value,
             minLevel: minLogLevel
         )
 
@@ -129,17 +134,17 @@ struct OnSignalViewModifier <Payload>: ViewModifier where Payload: Sendable, Pay
                 .debug,
                 source,
                 "Processing completed – pre",
-                signalReference.referencedValue,
+                signalPublisher.referencedValue.value,
                 minLevel: minLogLevel
             )
 
-            signalReference.referencedValue = handledSignal
+            signalPublisher.referencedValue.send(handledSignal)
 
             logger.log(
                 .info,
                 source,
                 "Processing completed – post",
-                signalReference.referencedValue,
+                signalPublisher.referencedValue.value,
                 minLevel: minLogLevel
             )
         }

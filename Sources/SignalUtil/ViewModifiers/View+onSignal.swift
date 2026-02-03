@@ -244,3 +244,24 @@ public extension View {
         )
     }
 }
+
+// MARK: - Without action
+public extension View {
+    func onSignal <Payload> (
+        of _: Payload.Type = Payload.self,
+        allowed: [Payload]? = nil,
+        isCompleting: Bool = false,
+        fileId: String = #fileID,
+        line: Int = #line
+    ) -> some View where Payload: Sendable, Payload: Equatable {
+        modifier(
+            OnSignalViewModifier<Payload>(
+                allowedPayloads: allowed,
+                fileId: fileId,
+                line: line
+            ) {
+                (isCompleting ? .complete : .continue, $0.payload)
+            }
+        )
+    }
+}

@@ -1,6 +1,6 @@
 import os
 
-struct Logger {
+struct Logger <Payload> where Payload: Equatable, Payload: Sendable {
     let logger: os.Logger
     let name: String
     let fileId: String
@@ -17,7 +17,7 @@ struct Logger {
         self.logger = .init()
     }
 
-    func log <Payload> (
+    func log (
         _ level: LogLevel,
         _ source: String?,
         _ text: String,
@@ -41,17 +41,19 @@ struct Logger {
         }
     }
 
-    private func prepareMessage <Payload> (
+    private func prepareMessage (
         _ level: LogLevel,
         _ source: String?,
         _ text: String,
         _ signal: Signal<Payload>?,
     ) -> String {
+        let prefix = "messaging-util [\(level)]"
         let level = String(describing: level)
-        let location = "\(name) (\(fileId):\(line))"
+        let payload = String(describing: Payload.self)
+        let location = "\(name) – \(fileId):\(line)"
         let signal = signal?.description ?? "nil"
 
-        let result = ["messaging-util [\(level)]", location, source, text, signal]
+        let result = [prefix, payload, location, source, text, signal]
             .compactMap { $0 }
             .joined(separator: " | ")
 

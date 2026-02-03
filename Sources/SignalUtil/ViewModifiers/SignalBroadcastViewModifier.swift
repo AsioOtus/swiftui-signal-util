@@ -7,13 +7,13 @@ Payload: Sendable,
 Payload: Equatable,
 PayloadPublisher: Publisher<Payload, Never>
 {
-    private let logger: Logger
+    private let logger: Logger<Payload>
     @Environment(\.signalLogLevel) private var minLogLevel: LogLevel
 
     private let eventCompletionHandler: (Signal<Payload>, Error?) -> Void
     private let payloadPublisher: PayloadPublisher
     
-    @StateObject private var signal: Reference<Signal<Payload>?> = .init(nil)
+    @StateObject private var signalPublisher: Reference<CurrentValueSubject<Signal<Payload>?, Never>> = .init(.init(nil))
 
     init (
         payloadPublisher: PayloadPublisher,
@@ -29,8 +29,8 @@ PayloadPublisher: Publisher<Payload, Never>
     func body (content: Content) -> some View {
         content
             .onReceive(payloadPublisher, perform: onNewSignal(payload:))
-            .onChange(of: signal.referencedValue, perform: onSignalChanged)
-            .environmentObject(signal)
+            .onReceive(signalPublisher.referencedValue, perform: onSignalChanged)
+            .environmentObject(signalPublisher)
     }
 
     private func onNewSignal (payload: Payload) {
@@ -49,19 +49,24 @@ PayloadPublisher: Publisher<Payload, Never>
             minLevel: minLogLevel
         )
 
-        if self.signal.referencedValue != nil && self.signal.referencedValue?.status.isCompleted == false {
+        if
+            self.signalPublisher.referencedValue.value != nil &&
+            self.signalPublisher.referencedValue.value?.status.isCompleted == false
+        {
             logger.log(
                 .trace,
                 nil,
                 "Current signal interrupted",
-                self.signal.referencedValue,
+                self.signalPublisher.referencedValue.value,
                 minLevel: minLogLevel
             )
 
-            self.signal.referencedValue = self.signal.referencedValue?.setStatus(.completed(InterruptedError()))
+            self.signalPublisher.referencedValue.send(
+                self.signalPublisher.referencedValue.value?.setStatus(.completed(InterruptedError()))
+            )
         }
 
-        self.signal.referencedValue = signal
+        self.signalPublisher.referencedValue.send(signal)
     }
 
     private func onSignalChanged (_ signal: Signal<Payload>?) {
