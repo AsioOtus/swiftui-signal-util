@@ -45,7 +45,7 @@ struct Logger <Payload> where Payload: Equatable, Payload: Sendable {
         _ level: LogLevel,
         _ source: String?,
         _ text: String,
-        _ signal: Signal<Payload>?,
+        _ signal: Signal<Payload>?
     ) -> String {
         let prefix = "messaging-util [\(level)]"
         let level = String(describing: level)
