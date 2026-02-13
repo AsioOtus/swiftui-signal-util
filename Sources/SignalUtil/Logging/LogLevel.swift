@@ -1,4 +1,4 @@
-public enum LogLevel: Int {
+public enum LogLevel: Int, Sendable {
     case all
     case notice
     case debug
